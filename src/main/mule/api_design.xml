@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:google-drive="http://www.mulesoft.org/schema/mule/google-drive" xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:snowflake="http://www.mulesoft.org/schema/mule/snowflake"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/snowflake http://www.mulesoft.org/schema/mule/snowflake/current/mule-snowflake.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/google-drive http://www.mulesoft.org/schema/mule/google-drive/current/mule-google-drive.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="92f8550d-ee9a-4f97-88c6-f948f08d2692" >
+		<http:listener-connection host="0.0.0.0" port="3000" />
+	</http:listener-config>
+	<snowflake:snowflake-config name="Snowflake_Config" doc:name="Snowflake Config" doc:id="425e5a0f-cda5-44e7-9309-48af7be3ad77" >
+		<snowflake:snowflake-connection accountName="${db.sfc.accountname}" warehouse="${db.sfc.warehouse}" database="${db.sfc.database}" schema="${db.sfc.schema}" user="${db.sfc.user}" password="${db.sfc.password}" role="${db.sfc.role}" />
+	</snowflake:snowflake-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="4d9fc91a-cf09-40a7-bc7f-9a8ff73c8515" file="myConfig-dev.yaml" />
+	<email:smtp-config name="Email_SMTP" doc:name="Email SMTP" doc:id="5e9b3087-becf-4775-9c1c-55c0bf28f06f" >
+		<email:smtp-connection host="smtp.gmail.com" port="587" user="yjena77@gmail.com" password="ouqxiiqludagkenm" >
+			<email:properties >
+				<email:property key="#[mail.smtp.starttls.enable]" value="true" />
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<email:smtp-config name="Email_SMTP1" doc:name="Email SMTP" doc:id="fa3ed622-4ea7-4ab0-afd8-364dfb98fcb5" >
+		<email:smtp-connection host="smtp.gmail.com" port="587" user="yjena77@gmail.com" password="ouqxiiqludagkenm">
+			<email:properties >
+				<email:property key="mail.smtp.starttls.enable" value="true" />
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<flow name="api_designFlow" doc:id="d550d45d-e888-4b25-ade6-3f8b8b991229" >
+		<http:listener doc:name="Listener" doc:id="4532a3e6-6d2a-4bb5-99f1-87f112426316" config-ref="HTTP_Listener_config" path="/bank"/>
+		<set-variable value="#[attributes.queryParams.customerName]" doc:name="Set customerName" doc:id="ec27b594-6e35-41d7-a373-009d871017e5" variableName="customerName" />
+		<set-variable value="#[attributes.queryParams.bank]" doc:name="Set bank" doc:id="f9934869-cff5-4cd5-b4be-e4ef9588e28a" variableName="bank" />
+		<set-variable value="#[attributes.queryParams.branchName]" doc:name="Set branchName" doc:id="34cea0a8-8083-4213-915a-a2afc8fe0b60" variableName="branchName"/>
+		<set-variable value="#[attributes.queryParams.acctType]" doc:name="Set acctType" doc:id="08dfcc0e-78d1-4af7-9a25-e5c23214c2b6" variableName="acctType" />
+		<set-variable value="#[[]]" doc:name="Set emptylist" doc:id="8928bc62-f0a1-44f2-95a2-8ddaffb259e0" variableName="inpPayload" />
+		<set-variable doc:name="set inpPayload" doc:id="682ebcbc-e42f-4fb4-ae54-032e50356a7b" variableName="inpPayload" value="#[%dw 2.0&#10;output application/json&#10;---&#10;vars.inpPayload &lt;&lt; payload]"/>
+		<set-variable doc:name="Set Email" doc:id="4517a9e5-a4dd-4837-a458-a2f75c89d50b" variableName="Email" value="#[payload.mailId]"/>
+		<snowflake:select doc:id="e1a5fe59-31db-4f87-bb2e-f6a49aff5dfa" config-ref="Snowflake_Config">
+			<snowflake:sql ><![CDATA[select custAccNum,bankName from Bank_Transactions where custAccNum = :custAccNum and bankName = :bankName ;]]></snowflake:sql>
+			<snowflake:input-parameters ><![CDATA[#[{
+	"custAccNum": payload.accountNum,
+	"bankName": vars.bank
+}]]]></snowflake:input-parameters>
+		</snowflake:select>
+		<choice doc:name="Choice" doc:id="6445e1ef-9867-43f0-9703-9edd7c55c7b5" >
+			<when expression="#[sizeOf(payload) &gt;=1]">
+				<ee:transform doc:name="Transform Message" doc:id="88a6d225-9f5c-4a0f-babc-e799e21f0599" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+(vars.inpPayload map {
+"Message": "Account " ++ $.accountNum ++" already exist "
+})
+
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<snowflake:insert doc:name="Insert" doc:id="a40a6663-ab20-456a-afda-010815ee4629" config-ref="Snowflake_Config" >
+					<snowflake:sql ><![CDATA[insert into Bank_Transactions (custName,custAccNum,atmPin,bankName,accountType,ifscCode,branchName,transactionTimeStamp,mailId,phoneNumber) values (:custName,:custAccNum,:atmPin,:bankName,:accountType,:ifscCode,:branchName,:transactionTimeStamp,:mailId,:phoneNumber);]]></snowflake:sql>
+					<snowflake:input-parameters ><![CDATA[#[%dw 2.0
+output application/json
+import java!java::sql::Timestamp
+---
+{
+	(vars.inpPayload map {
+		"custName": vars.customerName,
+		"custAccNum": $.accountNum,
+		"atmPin": $.atmPin,
+		"bankName": vars.bank ,
+		"accountType": vars.acctType,
+		"ifscCode": $.ifscCode,
+		"branchName": vars.branchName,
+		"transactionTimeStamp": 0 as DateTime,
+		"mailId": $.mailId,
+		"phoneNumber": $.contact
+		}
+		
+)}]]]></snowflake:input-parameters>
+				</snowflake:insert>
+				<email:send doc:name="Send" doc:id="42679932-1987-4f06-984d-7962f131be60" config-ref="Email_SMTP1" fromAddress="yjena77@gmail.com" subject="Mule Testing">
+					<email:to-addresses >
+						<email:to-address value="#[vars.Email]" />
+					</email:to-addresses>
+					<email:reply-to-addresses />
+					<email:body contentTransferEncoding="Binary" >
+						<email:content ><![CDATA["Mule Email Working"]]></email:content>
+					</email:body>
+				</email:send>
+				<ee:transform doc:name="Transform Message" doc:id="085cf906-49dd-4d42-a3e5-8f08ca3f2944" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+(vars.inpPayload map {
+"Message": "Account " ++ $.accountNum ++" created successfully "
+})
+
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>

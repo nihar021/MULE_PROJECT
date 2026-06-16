@@ -1,0 +1,16 @@
+
+http:
+  port: "8081"
+  
+  
+db:
+ sfc:
+    accountname: "KRTGKJV-AF36057"
+    warehouse: "COMPUTE_WH"
+    database: "VITECH"
+    schema: "BFS"
+    user: "jenanihar593"
+    password: "Nihar@sf123456"
+    role: "ACCOUNTADMIN"
+mail:
+ from:"yjena77@gmail.com"

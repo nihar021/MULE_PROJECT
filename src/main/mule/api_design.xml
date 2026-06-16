@@ -60,6 +60,7 @@ output application/json
 }]]></ee:set-payload>
 					</ee:message>
 				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="20d679bc-faa5-435b-84ac-72d3e5c5769d" message="------Logger-----------"/>
 			</when>
 			<otherwise >
 				<snowflake:insert doc:name="Insert" doc:id="a40a6663-ab20-456a-afda-010815ee4629" config-ref="Snowflake_Config" >
